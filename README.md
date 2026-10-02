@@ -19,7 +19,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173, then swipe memes with the Like and Nope buttons, and use the Likes tab to see what you liked. When all memes are swiped, press Reset to start over.
+Open http://localhost:5173, then swipe memes by dragging the card, with the Like and Nope buttons or with the left and right arrow keys, and use the Likes tab to see what you liked. When all memes are swiped, press Reset to start over.
 
 ## Commands
 

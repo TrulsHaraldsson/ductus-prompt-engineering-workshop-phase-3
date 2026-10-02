@@ -11,6 +11,7 @@ export function App() {
   const [meme, setMeme] = useState<Meme | null>(null);
   const [likes, setLikes] = useState<Meme[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [swiping, setSwiping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -45,15 +46,17 @@ export function App() {
   }
 
   async function swipe(direction: Direction) {
-    if (!meme) return;
+    if (!meme || swiping) return;
     setError(null);
+    setSwiping(true);
     try {
       await sendSwipe(meme.id, direction);
+      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
-      return;
+    } finally {
+      setSwiping(false);
     }
-    await load();
   }
 
   async function reset() {
@@ -83,17 +86,7 @@ export function App() {
       {view === "swipe" && loading && !error && <p>Loading…</p>}
       {view === "swipe" && !loading && !error && !meme && <EmptyState onReset={reset} />}
       {view === "swipe" && meme && (
-        <>
-          <MemeCard meme={meme} />
-          <div className="actions">
-            <button type="button" className="nope" onClick={() => swipe("nope")}>
-              Nope
-            </button>
-            <button type="button" className="like" onClick={() => swipe("like")}>
-              Like
-            </button>
-          </div>
-        </>
+        <MemeCard key={meme.id} meme={meme} onSwipe={swipe} disabled={swiping} />
       )}
     </main>
   );
