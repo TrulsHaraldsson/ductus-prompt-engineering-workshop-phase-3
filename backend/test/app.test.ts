@@ -207,3 +207,66 @@ describe("DELETE /api/swipes", () => {
     expect((await reset(app, "u1")).status).toBe(204);
   });
 });
+
+describe("GET /api/likes", () => {
+  const likes = (app: ReturnType<typeof setup>, userId: string) =>
+    request(app).get("/api/likes").set("X-User-Id", userId);
+
+  it("returns an empty list when the user has not liked anything", async () => {
+    const res = await likes(setup(), "u1");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ memes: [] });
+  });
+
+  it("returns liked memes but not nopes", async () => {
+    const app = setup();
+    const first = (await next(app, "u1")).body.meme;
+    await swipe(app, "u1", { memeId: first.id, direction: "nope" });
+    const second = (await next(app, "u1")).body.meme;
+    await swipe(app, "u1", { memeId: second.id, direction: "like" });
+
+    const res = await likes(app, "u1");
+
+    expect(res.status).toBe(200);
+    expect(res.body.memes).toEqual([second]);
+  });
+
+  it("returns likes in the same order every time", async () => {
+    const app = setup();
+    for (let i = 0; i < 3; i++) {
+      const { meme } = (await next(app, "u1")).body;
+      await swipe(app, "u1", { memeId: meme.id, direction: "like" });
+    }
+
+    const a = await likes(app, "u1");
+    const b = await likes(app, "u1");
+
+    expect(a.body.memes).toHaveLength(3);
+    expect(a.body).toEqual(b.body);
+  });
+
+  it("does not leak other users' likes", async () => {
+    const app = setup();
+    const { meme } = (await next(app, "u1")).body;
+    await swipe(app, "u1", { memeId: meme.id, direction: "like" });
+
+    expect((await likes(app, "u2")).body).toEqual({ memes: [] });
+  });
+
+  it("is empty after the swipes are reset", async () => {
+    const app = setup();
+    const { meme } = (await next(app, "u1")).body;
+    await swipe(app, "u1", { memeId: meme.id, direction: "like" });
+    await request(app).delete("/api/swipes").set("X-User-Id", "u1");
+
+    expect((await likes(app, "u1")).body).toEqual({ memes: [] });
+  });
+
+  it("rejects a missing user id", async () => {
+    const res = await request(setup()).get("/api/likes");
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: expect.any(String) });
+  });
+});
