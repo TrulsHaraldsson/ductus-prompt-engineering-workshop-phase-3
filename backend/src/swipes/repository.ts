@@ -11,6 +11,7 @@ export interface Swipe {
 export interface SwipeRepository {
   listByUser(userId: string): Swipe[];
   add(userId: string, swipe: Swipe): void;
+  clearByUser(userId: string): void;
 }
 
 export function createInMemorySwipeRepository(): SwipeRepository {
@@ -19,6 +20,9 @@ export function createInMemorySwipeRepository(): SwipeRepository {
     listByUser: (userId) => [...(swipesByUser.get(userId) ?? [])],
     add: (userId, swipe) => {
       swipesByUser.set(userId, [...(swipesByUser.get(userId) ?? []), swipe]);
+    },
+    clearByUser: (userId) => {
+      swipesByUser.delete(userId);
     },
   };
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchNextMeme, sendSwipe, type Direction, type Meme } from "./api";
+import { fetchNextMeme, resetSwipes, sendSwipe, type Direction, type Meme } from "./api";
+import { EmptyState } from "./EmptyState";
 import { MemeCard } from "./MemeCard";
 
 export function App() {
@@ -34,12 +35,23 @@ export function App() {
     await load();
   }
 
+  async function reset() {
+    setError(null);
+    try {
+      await resetSwipes();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+      return;
+    }
+    await load();
+  }
+
   return (
     <main>
       <h1>Meme-Tinder</h1>
       {error && <p role="alert">Something went wrong: {error}. Is the backend running?</p>}
       {loading && !error && <p>Loading…</p>}
-      {!loading && !error && !meme && <p>No more memes.</p>}
+      {!loading && !error && !meme && <EmptyState onReset={reset} />}
       {meme && (
         <>
           <MemeCard meme={meme} />

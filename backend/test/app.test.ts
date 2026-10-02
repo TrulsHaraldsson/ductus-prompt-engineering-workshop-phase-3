@@ -156,3 +156,54 @@ describe("POST /api/swipes", () => {
     expect((await next(app, "u1")).body.meme.id).not.toBe(meme.id);
   });
 });
+
+describe("DELETE /api/swipes", () => {
+  const reset = (app: ReturnType<typeof setup>, userId: string) =>
+    request(app).delete("/api/swipes").set("X-User-Id", userId);
+
+  async function swipeEverything(app: ReturnType<typeof setup>, userId: string) {
+    const ids: string[] = [];
+    for (;;) {
+      const { meme } = (await next(app, userId)).body;
+      if (!meme) return ids;
+      ids.push(meme.id);
+      await swipe(app, userId, { memeId: meme.id, direction: "like" });
+    }
+  }
+
+  it("resets the swipes so next returns memes again", async () => {
+    const app = setup();
+    const ids = await swipeEverything(app, "u1");
+
+    const res = await reset(app, "u1");
+
+    expect(res.status).toBe(204);
+    expect(res.body).toEqual({});
+    expect((await next(app, "u1")).body.meme.id).toBe(ids[0]);
+  });
+
+  it("rejects a request without a user id", async () => {
+    const res = await request(setup()).delete("/api/swipes");
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/X-User-Id/);
+  });
+
+  it("does not affect other users", async () => {
+    const app = setup();
+    await swipeEverything(app, "u1");
+    await swipeEverything(app, "u2");
+
+    await reset(app, "u1");
+
+    expect((await next(app, "u1")).body.meme).not.toBeNull();
+    expect((await next(app, "u2")).body).toEqual({ meme: null });
+  });
+
+  it("is safe to call repeatedly", async () => {
+    const app = setup();
+
+    expect((await reset(app, "u1")).status).toBe(204);
+    expect((await reset(app, "u1")).status).toBe(204);
+  });
+});

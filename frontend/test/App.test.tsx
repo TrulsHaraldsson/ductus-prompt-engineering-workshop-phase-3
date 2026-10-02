@@ -42,13 +42,45 @@ describe("App", () => {
     expect(init.headers["X-User-Id"]).toEqual(expect.any(String));
   });
 
-  it("does not crash when there are no more memes", async () => {
+  it("shows the empty state with a Reset button when there are no more memes", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok({ meme: null })));
 
     render(<App />);
 
-    expect(await screen.findByText("No more memes.")).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(await screen.findByText("You have seen all memes")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reset" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Like" })).not.toBeInTheDocument();
+  });
+
+  it("resets the swipe history and shows a meme again when Reset is clicked", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ meme: null }))
+      .mockResolvedValueOnce({ ok: true, status: 204 })
+      .mockResolvedValueOnce(ok({ meme: first }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reset" }));
+
+    expect(await screen.findByRole("img", { name: first.caption })).toBeInTheDocument();
+    expect(screen.queryByText("You have seen all memes")).not.toBeInTheDocument();
+    const [url, init] = fetchMock.mock.calls[1];
+    expect(url).toBe("/api/swipes");
+    expect(init.method).toBe("DELETE");
+    expect(init.headers["X-User-Id"]).toEqual(expect.any(String));
+  });
+
+  it("shows an error message when the reset fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(ok({ meme: null })).mockResolvedValueOnce({ ok: false, status: 500 }),
+    );
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reset" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong");
   });
 
   it("shows an error message when the backend fails", async () => {

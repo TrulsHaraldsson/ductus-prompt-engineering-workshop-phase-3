@@ -14,7 +14,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers: { ...init.headers, "X-User-Id": getUserId() },
   });
   if (!res.ok) throw new Error(`Request failed (HTTP ${res.status})`);
-  return res.json();
+  return res.status === 204 ? (undefined as T) : res.json();
 }
 
 /** Resolves to null when the user has swiped every meme. */
@@ -29,4 +29,9 @@ export async function sendSwipe(memeId: string, direction: Direction): Promise<v
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ memeId, direction }),
   });
+}
+
+/** Removes all of the user's swipes, including likes. */
+export async function resetSwipes(): Promise<void> {
+  await request("/api/swipes", { method: "DELETE" });
 }

@@ -58,6 +58,14 @@ export function createApp(swipeService: SwipeService) {
     }
   });
 
+  // 204 No Content. Removes all of the user's swipes, including likes. Safe to repeat.
+  app.delete("/api/swipes", (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+    swipeService.resetSwipes(userId);
+    res.status(204).end();
+  });
+
   // Malformed JSON bodies and other client errors from middleware get a JSON error too.
   app.use((err: { status?: number; message?: string }, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status && err.status < 500 ? err.status : 500;

@@ -55,3 +55,14 @@ main {
 .actions .nope {
   background: #d64545;
 }
+
+.empty-state button {
+  padding: 0.75rem 2rem;
+  border: 0;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #fff;
+  background: #2e9e5b;
+  cursor: pointer;
+}
