@@ -21,7 +21,12 @@ function isDirection(value: unknown): value is Direction {
   return DIRECTIONS.includes(value as Direction);
 }
 
-export function createApp(swipeService: SwipeService) {
+export interface AppOptions {
+  /** Directory with the built frontend. When set, it is served as static files with an SPA fallback. */
+  staticDir?: string;
+}
+
+export function createApp(swipeService: SwipeService, options: AppOptions = {}) {
   const app = express();
   app.use(express.json());
 
@@ -72,6 +77,20 @@ export function createApp(swipeService: SwipeService) {
     swipeService.resetSwipes(userId);
     res.status(204).end();
   });
+
+  // Built frontend (production only). Registered after the API routes and never answers /api paths.
+  if (options.staticDir) {
+    const staticDir = path.resolve(options.staticDir);
+    app.use(express.static(staticDir));
+    app.use((req, res, next) => {
+      const isApiPath = req.path === "/api" || req.path.startsWith("/api/");
+      if ((req.method !== "GET" && req.method !== "HEAD") || isApiPath) {
+        next();
+        return;
+      }
+      res.sendFile(path.join(staticDir, "index.html"));
+    });
+  }
 
   // Malformed JSON bodies and other client errors from middleware get a JSON error too.
   app.use((err: { status?: number; message?: string }, _req: Request, res: Response, _next: NextFunction) => {
