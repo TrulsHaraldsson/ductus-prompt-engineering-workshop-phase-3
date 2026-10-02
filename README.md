@@ -19,7 +19,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 to see a meme.
+Open http://localhost:5173, then swipe memes with the Like and Nope buttons.
 
 ## Commands
 
@@ -28,3 +28,16 @@ Open http://localhost:5173 to see a meme.
 | `npm run dev`   | Starts backend and frontend in watch mode     |
 | `npm test`      | Runs all backend and frontend tests           |
 | `npm run build` | Builds both workspaces                        |
+
+## API
+
+All endpoints are under `/api` and need an `X-User-Id` header (the frontend creates an anonymous id on first visit and stores it in localStorage).
+
+| Endpoint                | Description                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `GET /api/memes/next`   | `200 { "meme": {...} }` with the next unseen meme, or `200 { "meme": null }` when all memes have been swiped |
+| `POST /api/swipes`      | Body `{ "memeId": "...", "direction": "like" \| "nope" }`. `200` with the stored swipe                       |
+
+Errors are JSON `{ "error": "..." }`: `400` for a missing user id, missing meme id or invalid direction, `404` for an unknown meme id. Swiping the same meme twice is idempotent: the first swipe is kept.
+
+Swipes are stored in memory (`backend/src/swipes/repository.ts`) and are lost on restart. Implement `SwipeRepository` to plug in a database.

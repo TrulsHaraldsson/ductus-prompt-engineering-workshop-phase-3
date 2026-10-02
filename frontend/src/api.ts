@@ -1,11 +1,32 @@
+import { getUserId } from "./identity";
+
 export interface Meme {
   id: string;
   caption: string;
   imageUrl: string;
 }
 
-export async function fetchNextMeme(): Promise<Meme> {
-  const res = await fetch("/api/memes/next");
-  if (!res.ok) throw new Error(`Failed to load meme (HTTP ${res.status})`);
+export type Direction = "like" | "nope";
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(path, {
+    ...init,
+    headers: { ...init.headers, "X-User-Id": getUserId() },
+  });
+  if (!res.ok) throw new Error(`Request failed (HTTP ${res.status})`);
   return res.json();
+}
+
+/** Resolves to null when the user has swiped every meme. */
+export async function fetchNextMeme(): Promise<Meme | null> {
+  const { meme } = await request<{ meme: Meme | null }>("/api/memes/next");
+  return meme;
+}
+
+export async function sendSwipe(memeId: string, direction: Direction): Promise<void> {
+  await request("/api/swipes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ memeId, direction }),
+  });
 }
