@@ -42,6 +42,48 @@ describe("swipe service", () => {
     expect(service.getNextMeme("u2")?.id).toBe("a");
   });
 
+  it("makes previously swiped memes available again after a reset", () => {
+    const service = setup();
+    service.recordSwipe("u1", "a", "like");
+    service.recordSwipe("u1", "b", "nope");
+    expect(service.getNextMeme("u1")).toBeNull();
+
+    service.resetSwipes("u1");
+
+    expect(service.getNextMeme("u1")?.id).toBe("a");
+  });
+
+  it("clears likes and nopes on reset", () => {
+    const service = setup();
+    service.recordSwipe("u1", "a", "like");
+    service.recordSwipe("u1", "b", "nope");
+
+    service.resetSwipes("u1");
+
+    // A fresh swipe is stored with its new direction, so nothing from before survived.
+    expect(service.recordSwipe("u1", "a", "nope")).toEqual({ memeId: "a", direction: "nope" });
+    expect(service.recordSwipe("u1", "b", "like")).toEqual({ memeId: "b", direction: "like" });
+  });
+
+  it("only resets the given user", () => {
+    const service = setup();
+    service.recordSwipe("u1", "a", "like");
+    service.recordSwipe("u2", "a", "like");
+
+    service.resetSwipes("u1");
+
+    expect(service.getNextMeme("u1")?.id).toBe("a");
+    expect(service.getNextMeme("u2")?.id).toBe("b");
+  });
+
+  it("does nothing harmful when resetting a user with no swipes", () => {
+    const service = setup();
+
+    expect(() => service.resetSwipes("u1")).not.toThrow();
+    expect(() => service.resetSwipes("u1")).not.toThrow();
+    expect(service.getNextMeme("u1")?.id).toBe("a");
+  });
+
   it("rejects an unknown meme id", () => {
     expect(() => setup().recordSwipe("u1", "nope-such-meme", "like")).toThrow(UnknownMemeError);
   });

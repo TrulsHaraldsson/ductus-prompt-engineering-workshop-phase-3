@@ -19,7 +19,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173, then swipe memes with the Like and Nope buttons.
+Open http://localhost:5173, then swipe memes with the Like and Nope buttons. When all memes are swiped, press Reset to start over.
 
 ## Commands
 
@@ -37,6 +37,7 @@ All endpoints are under `/api` and need an `X-User-Id` header (the frontend crea
 | ----------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `GET /api/memes/next`   | `200 { "meme": {...} }` with the next unseen meme, or `200 { "meme": null }` when all memes have been swiped |
 | `POST /api/swipes`      | Body `{ "memeId": "...", "direction": "like" \| "nope" }`. `200` with the stored swipe                       |
+| `DELETE /api/swipes`    | Removes all of the user's swipes, including likes. `204 No Content`; safe to call repeatedly                 |
 
 Errors are JSON `{ "error": "..." }`: `400` for a missing user id, missing meme id or invalid direction, `404` for an unknown meme id. Swiping the same meme twice is idempotent: the first swipe is kept.
 
