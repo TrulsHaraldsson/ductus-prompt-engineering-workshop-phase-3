@@ -42,6 +42,46 @@ describe("App", () => {
     expect(init.headers["X-User-Id"]).toEqual(expect.any(String));
   });
 
+  it("swipes with the arrow keys in the swipe view but not in the likes view", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ meme: first }))
+      .mockResolvedValueOnce(ok({ memeId: first.id, direction: "like" }))
+      .mockResolvedValueOnce(ok({ meme: second }))
+      .mockResolvedValueOnce(ok({ memes: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    await screen.findByRole("img", { name: first.caption });
+
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    await screen.findByRole("img", { name: second.caption });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ memeId: first.id, direction: "like" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Likes" }));
+    await screen.findByText("You have not liked any memes yet.");
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("sends only one swipe while a swipe request is in flight", async () => {
+    let finish: (value: unknown) => void = () => {};
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ meme: first }))
+      .mockReturnValueOnce(new Promise((resolve) => (finish = resolve)))
+      .mockResolvedValueOnce(ok({ meme: second }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    await screen.findByRole("img", { name: first.caption });
+
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    finish(ok({ memeId: first.id, direction: "like" }));
+
+    await screen.findByRole("img", { name: second.caption });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("shows the empty state with a Reset button when there are no more memes", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(ok({ meme: null })));
 

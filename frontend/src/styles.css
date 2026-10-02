@@ -18,6 +18,16 @@ main {
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  /* Let the browser keep vertical scrolling; horizontal moves go to our drag handler. */
+  touch-action: pan-y;
+  user-select: none;
+  cursor: grab;
+  transition: transform 0.2s ease;
+}
+
+.meme-card.dragging {
+  cursor: grabbing;
+  transition: none;
 }
 
 .meme-card img {
