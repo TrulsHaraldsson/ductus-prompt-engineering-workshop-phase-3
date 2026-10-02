@@ -19,6 +19,8 @@ npm install
 npm run dev
 ```
 
+To run in Docker instead, or for more detail on both options, see [deploy/README.md](deploy/README.md).
+
 Open http://localhost:5173, then swipe memes by dragging the card, with the Like and Nope buttons or with the left and right arrow keys, and use the Likes tab to see what you liked. When all memes are swiped, press Reset to start over.
 
 ## Commands

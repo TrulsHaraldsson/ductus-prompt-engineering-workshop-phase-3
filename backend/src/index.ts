@@ -7,6 +7,9 @@ const port = Number(process.env.PORT ?? 3000);
 
 const swipeService = createSwipeService(createMemeCatalog(), createInMemorySwipeRepository());
 
-createApp(swipeService).listen(port, () => {
+// Set STATIC_DIR to the built frontend (frontend/dist) to serve it from this process, as the container does.
+const staticDir = process.env.STATIC_DIR;
+
+createApp(swipeService, { staticDir }).listen(port, () => {
   console.log(`Backend listening on http://localhost:${port}`);
 });
