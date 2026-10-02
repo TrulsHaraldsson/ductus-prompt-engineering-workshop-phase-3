@@ -1,23 +1,58 @@
-import { useEffect, useState } from "react";
-import { fetchNextMeme, type Meme } from "./api";
+import { useCallback, useEffect, useState } from "react";
+import { fetchNextMeme, sendSwipe, type Direction, type Meme } from "./api";
 import { MemeCard } from "./MemeCard";
 
 export function App() {
   const [meme, setMeme] = useState<Meme | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchNextMeme()
-      .then(setMeme)
-      .catch((err: Error) => setError(err.message));
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      setMeme(await fetchNextMeme());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function swipe(direction: Direction) {
+    if (!meme) return;
+    setError(null);
+    try {
+      await sendSwipe(meme.id, direction);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+      return;
+    }
+    await load();
+  }
 
   return (
     <main>
       <h1>Meme-Tinder</h1>
-      {error && <p role="alert">Could not load a meme: {error}</p>}
-      {!error && !meme && <p>Loading…</p>}
-      {meme && <MemeCard meme={meme} />}
+      {error && <p role="alert">Something went wrong: {error}. Is the backend running?</p>}
+      {loading && !error && <p>Loading…</p>}
+      {!loading && !error && !meme && <p>No more memes.</p>}
+      {meme && (
+        <>
+          <MemeCard meme={meme} />
+          <div className="actions">
+            <button type="button" className="nope" onClick={() => swipe("nope")}>
+              Nope
+            </button>
+            <button type="button" className="like" onClick={() => swipe("like")}>
+              Like
+            </button>
+          </div>
+        </>
+      )}
     </main>
   );
 }

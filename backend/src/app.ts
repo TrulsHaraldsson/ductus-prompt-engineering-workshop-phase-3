@@ -1,23 +1,67 @@
-import express from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { IMAGE_PATH, type MemeCatalog } from "./memes/catalog.js";
+import { IMAGE_PATH } from "./memes/catalog.js";
+import { DIRECTIONS, type Direction } from "./swipes/repository.js";
+import { UnknownMemeError, type SwipeService } from "./swipes/service.js";
 
 const assetsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../assets/memes");
 
-export function createApp(catalog: MemeCatalog) {
+/** Returns the user id from the X-User-Id header, or sends 400 and returns null. */
+function requireUserId(req: Request, res: Response): string | null {
+  const userId = req.header("X-User-Id")?.trim();
+  if (!userId) {
+    res.status(400).json({ error: "Missing X-User-Id header" });
+    return null;
+  }
+  return userId;
+}
+
+function isDirection(value: unknown): value is Direction {
+  return DIRECTIONS.includes(value as Direction);
+}
+
+export function createApp(swipeService: SwipeService) {
   const app = express();
+  app.use(express.json());
 
   app.use(IMAGE_PATH, express.static(assetsDir));
 
-  // Placeholder: always returns the first meme. Issue #3 replaces this with per-user swipe logic.
-  app.get("/api/memes/next", (_req, res) => {
-    const [meme] = catalog.list();
-    if (!meme) {
-      res.status(404).json({ error: "No memes available" });
+  // 200 with { meme }. When the user has swiped every meme, meme is null.
+  app.get("/api/memes/next", (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+    res.json({ meme: swipeService.getNextMeme(userId) });
+  });
+
+  // 200 with the stored swipe. Swiping the same meme twice keeps the first swipe.
+  app.post("/api/swipes", (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+    const { memeId, direction } = req.body ?? {};
+    if (typeof memeId !== "string" || !memeId) {
+      res.status(400).json({ error: "memeId is required" });
       return;
     }
-    res.json(meme);
+    if (!isDirection(direction)) {
+      res.status(400).json({ error: `direction must be one of: ${DIRECTIONS.join(", ")}` });
+      return;
+    }
+    try {
+      res.json(swipeService.recordSwipe(userId, memeId, direction));
+    } catch (err) {
+      if (err instanceof UnknownMemeError) {
+        res.status(404).json({ error: err.message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  // Malformed JSON bodies and other client errors from middleware get a JSON error too.
+  app.use((err: { status?: number; message?: string }, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status && err.status < 500 ? err.status : 500;
+    res.status(status).json({ error: status < 500 ? "Invalid request" : "Internal server error" });
   });
 
   return app;

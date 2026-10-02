@@ -2,15 +2,27 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { createMemeCatalog } from "../src/memes/catalog.js";
+import { createInMemorySwipeRepository } from "../src/swipes/repository.js";
+import { createSwipeService } from "../src/swipes/service.js";
+
+// Every call builds fresh state, so tests are independent.
+function setup() {
+  const catalog = createMemeCatalog();
+  return createApp(createSwipeService(catalog, createInMemorySwipeRepository()));
+}
+
+const swipe = (app: ReturnType<typeof setup>, userId: string, body: object) =>
+  request(app).post("/api/swipes").set("X-User-Id", userId).send(body);
+
+const next = (app: ReturnType<typeof setup>, userId: string) =>
+  request(app).get("/api/memes/next").set("X-User-Id", userId);
 
 describe("GET /api/memes/next", () => {
   it("returns a meme with an id, caption and image url", async () => {
-    const app = createApp(createMemeCatalog());
-
-    const res = await request(app).get("/api/memes/next");
+    const res = await next(setup(), "u1");
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({
+    expect(res.body.meme).toEqual({
       id: expect.any(String),
       caption: expect.any(String),
       imageUrl: expect.stringMatching(/\.svg$/),
@@ -18,12 +30,129 @@ describe("GET /api/memes/next", () => {
   });
 
   it("serves the image the meme points to", async () => {
-    const app = createApp(createMemeCatalog());
-    const { body } = await request(app).get("/api/memes/next");
+    const app = setup();
+    const { body } = await next(app, "u1");
 
-    const image = await request(app).get(body.imageUrl);
+    const image = await request(app).get(body.meme.imageUrl);
 
     expect(image.status).toBe(200);
     expect(image.headers["content-type"]).toContain("image/svg+xml");
+  });
+
+  it("rejects a request without a user id", async () => {
+    const res = await request(setup()).get("/api/memes/next");
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/X-User-Id/);
+  });
+
+  it("rejects an empty user id", async () => {
+    const res = await request(setup()).get("/api/memes/next").set("X-User-Id", "  ");
+
+    expect(res.status).toBe(400);
+  });
+
+  it("never returns a meme the user has already swiped", async () => {
+    const app = setup();
+    const seen = new Set<string>();
+    for (let i = 0; i < 3; i++) {
+      const { body } = await next(app, "u1");
+      expect(seen.has(body.meme.id)).toBe(false);
+      seen.add(body.meme.id);
+      await swipe(app, "u1", { memeId: body.meme.id, direction: i % 2 ? "nope" : "like" });
+    }
+  });
+
+  it("keeps users independent", async () => {
+    const app = setup();
+    const first = (await next(app, "u1")).body.meme;
+    await swipe(app, "u1", { memeId: first.id, direction: "like" });
+
+    expect((await next(app, "u1")).body.meme.id).not.toBe(first.id);
+    expect((await next(app, "u2")).body.meme.id).toBe(first.id);
+  });
+
+  it("returns { meme: null } when every meme has been swiped", async () => {
+    const app = setup();
+    for (;;) {
+      const { meme } = (await next(app, "u1")).body;
+      if (!meme) break;
+      await swipe(app, "u1", { memeId: meme.id, direction: "nope" });
+    }
+
+    const res = await next(app, "u1");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ meme: null });
+  });
+});
+
+describe("POST /api/swipes", () => {
+  it("records a swipe", async () => {
+    const app = setup();
+    const { meme } = (await next(app, "u1")).body;
+
+    const res = await swipe(app, "u1", { memeId: meme.id, direction: "like" });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ memeId: meme.id, direction: "like" });
+  });
+
+  it("rejects a request without a user id", async () => {
+    const res = await request(setup()).post("/api/swipes").send({ memeId: "x", direction: "like" });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects an invalid direction", async () => {
+    const app = setup();
+    const { meme } = (await next(app, "u1")).body;
+
+    const res = await swipe(app, "u1", { memeId: meme.id, direction: "sideways" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/direction/);
+  });
+
+  it("rejects a missing meme id", async () => {
+    const res = await swipe(setup(), "u1", { direction: "like" });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects a request without a body", async () => {
+    const res = await request(setup()).post("/api/swipes").set("X-User-Id", "u1");
+
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects malformed JSON with a JSON error", async () => {
+    const res = await request(setup())
+      .post("/api/swipes")
+      .set("X-User-Id", "u1")
+      .set("Content-Type", "application/json")
+      .send("{not json");
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toEqual(expect.any(String));
+  });
+
+  it("returns 404 for an unknown meme id", async () => {
+    const res = await swipe(setup(), "u1", { memeId: "does-not-exist", direction: "like" });
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toMatch(/does-not-exist/);
+  });
+
+  it("keeps the first swipe when the same meme is swiped twice", async () => {
+    const app = setup();
+    const { meme } = (await next(app, "u1")).body;
+    await swipe(app, "u1", { memeId: meme.id, direction: "like" });
+
+    const res = await swipe(app, "u1", { memeId: meme.id, direction: "nope" });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ memeId: meme.id, direction: "like" });
+    expect((await next(app, "u1")).body.meme.id).not.toBe(meme.id);
   });
 });
