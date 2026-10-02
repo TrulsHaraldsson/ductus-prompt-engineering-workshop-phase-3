@@ -66,3 +66,33 @@ main {
   background: #2e9e5b;
   cursor: pointer;
 }
+
+nav {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+nav button {
+  padding: 0.5rem 1.5rem;
+  border: 2px solid #d64545;
+  border-radius: 999px;
+  font-weight: 600;
+  color: #d64545;
+  background: transparent;
+  cursor: pointer;
+}
+
+nav button[aria-current="page"] {
+  color: #fff;
+  background: #d64545;
+}
+
+.likes-view ul {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

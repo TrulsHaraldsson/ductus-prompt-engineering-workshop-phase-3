@@ -31,6 +31,12 @@ export async function sendSwipe(memeId: string, direction: Direction): Promise<v
   });
 }
 
+/** The memes the user has liked, in a stable order. */
+export async function fetchLikes(): Promise<Meme[]> {
+  const { memes } = await request<{ memes: Meme[] }>("/api/likes");
+  return memes;
+}
+
 /** Removes all of the user's swipes, including likes. */
 export async function resetSwipes(): Promise<void> {
   await request("/api/swipes", { method: "DELETE" });

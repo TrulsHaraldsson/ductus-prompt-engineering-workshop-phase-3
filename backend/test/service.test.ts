@@ -87,4 +87,66 @@ describe("swipe service", () => {
   it("rejects an unknown meme id", () => {
     expect(() => setup().recordSwipe("u1", "nope-such-meme", "like")).toThrow(UnknownMemeError);
   });
+
+  describe("listLikedMemes", () => {
+    function setupWithThree() {
+      const catalog = createMemeCatalog([
+        { id: "a", caption: "A", file: "a.svg" },
+        { id: "b", caption: "B", file: "b.svg" },
+        { id: "c", caption: "C", file: "c.svg" },
+      ]);
+      return createSwipeService(catalog, createInMemorySwipeRepository());
+    }
+    const ids = (memes: { id: string }[]) => memes.map((meme) => meme.id);
+
+    it("returns an empty list for a user with no swipes", () => {
+      expect(setupWithThree().listLikedMemes("u1")).toEqual([]);
+    });
+
+    it("returns only liked memes, not nopes", () => {
+      const service = setupWithThree();
+      service.recordSwipe("u1", "a", "nope");
+      service.recordSwipe("u1", "b", "like");
+
+      expect(ids(service.listLikedMemes("u1"))).toEqual(["b"]);
+    });
+
+    it("returns full memes in a consistent order regardless of swipe order", () => {
+      const service = setupWithThree();
+      service.recordSwipe("u1", "c", "like");
+      service.recordSwipe("u1", "a", "like");
+
+      const likes = service.listLikedMemes("u1");
+
+      expect(ids(likes)).toEqual(["a", "c"]);
+      expect(likes[0]).toEqual({ id: "a", caption: "A", imageUrl: expect.stringMatching(/a\.svg$/) });
+      expect(service.listLikedMemes("u1")).toEqual(likes);
+    });
+
+    it("keeps likes separate per user", () => {
+      const service = setupWithThree();
+      service.recordSwipe("u1", "a", "like");
+      service.recordSwipe("u2", "b", "like");
+
+      expect(ids(service.listLikedMemes("u1"))).toEqual(["a"]);
+      expect(ids(service.listLikedMemes("u2"))).toEqual(["b"]);
+    });
+
+    it("keeps the first swipe when a liked meme is swiped as nope again", () => {
+      const service = setupWithThree();
+      service.recordSwipe("u1", "a", "like");
+      service.recordSwipe("u1", "a", "nope");
+
+      expect(ids(service.listLikedMemes("u1"))).toEqual(["a"]);
+    });
+
+    it("is empty again after a reset", () => {
+      const service = setupWithThree();
+      service.recordSwipe("u1", "a", "like");
+
+      service.resetSwipes("u1");
+
+      expect(service.listLikedMemes("u1")).toEqual([]);
+    });
+  });
 });

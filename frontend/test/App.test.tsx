@@ -111,4 +111,70 @@ describe("App", () => {
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
   });
+
+  describe("likes view", () => {
+    it("lists the liked memes when the Likes button is clicked", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(ok({ meme: first }))
+        .mockResolvedValueOnce(ok({ memes: [first, second] }));
+      vi.stubGlobal("fetch", fetchMock);
+      render(<App />);
+      await screen.findByRole("img", { name: first.caption });
+
+      fireEvent.click(screen.getByRole("button", { name: "Likes" }));
+
+      expect(await screen.findByRole("heading", { name: "Your likes" })).toBeInTheDocument();
+      expect(screen.getByRole("img", { name: first.caption })).toHaveAttribute("src", first.imageUrl);
+      expect(screen.getByRole("img", { name: second.caption })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Like" })).not.toBeInTheDocument();
+      expect(fetchMock.mock.calls[1][0]).toBe("/api/likes");
+      expect(fetchMock.mock.calls[1][1].headers["X-User-Id"]).toEqual(expect.any(String));
+    });
+
+    it("shows an empty message when nothing is liked", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(ok({ meme: first })).mockResolvedValueOnce(ok({ memes: [] })));
+      render(<App />);
+      await screen.findByRole("img", { name: first.caption });
+
+      fireEvent.click(screen.getByRole("button", { name: "Likes" }));
+
+      expect(await screen.findByText("You have not liked any memes yet.")).toBeInTheDocument();
+    });
+
+    it("navigates back to the swipe view", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValueOnce(ok({ meme: first }))
+          .mockResolvedValueOnce(ok({ memes: [] }))
+          .mockResolvedValueOnce(ok({ meme: first })),
+      );
+      render(<App />);
+      await screen.findByRole("img", { name: first.caption });
+      fireEvent.click(screen.getByRole("button", { name: "Likes" }));
+      await screen.findByText("You have not liked any memes yet.");
+
+      fireEvent.click(screen.getByRole("button", { name: "Swipe" }));
+
+      expect(await screen.findByRole("img", { name: first.caption })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Like" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Your likes" })).not.toBeInTheDocument();
+    });
+
+    it("shows an error message when loading likes fails", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValueOnce(ok({ meme: first })).mockResolvedValueOnce({ ok: false, status: 500 }),
+      );
+      render(<App />);
+      await screen.findByRole("img", { name: first.caption });
+
+      fireEvent.click(screen.getByRole("button", { name: "Likes" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong");
+      expect(screen.queryByText("You have not liked any memes yet.")).not.toBeInTheDocument();
+    });
+  });
 });

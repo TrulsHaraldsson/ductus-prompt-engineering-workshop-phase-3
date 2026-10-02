@@ -58,6 +58,13 @@ export function createApp(swipeService: SwipeService) {
     }
   });
 
+  // 200 with { memes }: the user's liked memes in catalog order, or an empty list.
+  app.get("/api/likes", (req, res) => {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+    res.json({ memes: swipeService.listLikedMemes(userId) });
+  });
+
   // 204 No Content. Removes all of the user's swipes, including likes. Safe to repeat.
   app.delete("/api/swipes", (req, res) => {
     const userId = requireUserId(req, res);

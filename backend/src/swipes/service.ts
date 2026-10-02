@@ -15,6 +15,8 @@ export interface SwipeService {
    * and returned. Throws UnknownMemeError if the meme does not exist.
    */
   recordSwipe(userId: string, memeId: string, direction: Direction): Swipe;
+  /** The memes the user has liked, in catalog order (a stable order that does not depend on the repository). */
+  listLikedMemes(userId: string): Meme[];
   /** Removes all of the user's swipes, including likes. Safe to call repeatedly. */
   resetSwipes(userId: string): void;
 }
@@ -33,6 +35,16 @@ export function createSwipeService(catalog: MemeCatalog, repository: SwipeReposi
       const swipe = { memeId, direction };
       repository.add(userId, swipe);
       return swipe;
+    },
+
+    listLikedMemes(userId) {
+      const liked = new Set(
+        repository
+          .listByUser(userId)
+          .filter((swipe) => swipe.direction === "like")
+          .map((swipe) => swipe.memeId),
+      );
+      return catalog.list().filter((meme) => liked.has(meme.id));
     },
 
     resetSwipes(userId) {
